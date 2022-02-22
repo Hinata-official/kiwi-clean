@@ -1,0 +1,12 @@
+127.0.0.1 localhost
+127.0.0.1 ip6-localhost
+127.0.0.1 ip6-loopback
+::1 localhost
+::1 ip6-localhost
+::1 ip6-loopback
+#虎牙直播
+127.0.0.1 bd.p2p.huya.com
+127.0.0.1 al.p2p.huya.com
+127.0.0.1 livewebbs2.msstatic.com
+127.0.0.1 cdn.wup.huya.com
+127.0.0.1 statwup.huya.com
