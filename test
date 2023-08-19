@@ -1,0 +1,442 @@
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <vector>
+#include <queue>
+#include <stack>
+#include <map>
+#include <codecvt>
+#include <locale>
+#include <sstream>
+#include <iomanip>
+#include <locale>
+#include <codecvt>
+#include <time.h>
+using namespace std;
+
+struct Package {
+    string id;
+    string name;
+    string description;
+    double price{};
+    bool available{};
+};
+
+struct Order {
+    string id;
+    string package_id;
+    int quantity{};
+    string customer_name;
+    string customer_phone;
+    string delivery_address;
+    bool delivered{};
+    time_t time{};
+};
+
+struct Location {
+    string name;
+    map<string, double> distances;
+};
+
+// Define global variables for package, order, and location information
+vector<Package> packages;
+vector<Order> orders;
+map<string, Location> locations;
+
+string wstring_to_string(const wstring &wstr) {
+    wstring_convert<codecvt_utf8<wchar_t>> conv;
+    return conv.to_bytes(wstr);
+}
+
+// Function to read package information from file
+void read_packages(const string& filename) {
+    wifstream file(filename);
+    file.imbue(locale(file.getloc(), new codecvt_utf8<wchar_t>));
+    if (file.is_open()) {
+        wstring line;
+        while (getline(file, line)) {
+            // Parse package information from line
+            Package package;
+            size_t pos = 0;
+            size_t next_pos = line.find(L' ', pos);
+            package.id = wstring_to_string(line.substr(pos, next_pos - pos));
+            pos = next_pos + 1;
+            next_pos = line.find(L' ', pos);
+            package.name = wstring_to_string(line.substr(pos, next_pos - pos));
+            pos = next_pos + 1;
+            next_pos = line.rfind(L' ');
+            package.description = wstring_to_string(line.substr(pos, next_pos - pos));
+            pos = next_pos + 1;
+            next_pos = line.rfind(L' ', pos);
+            string price_str = wstring_to_string(line.substr(pos, next_pos - pos));
+            if (price_str.empty() || !isdigit(price_str[0])) {
+                cerr << "Invalid price: " << price_str << endl;
+            } else {
+                package.price = stod(price_str);
+            }
+
+            package.available = (line.back() == L'1');
+            packages.push_back(package);
+        }
+        file.close();
+    }
+}
+
+// Function to read order information from file
+void read_orders(const string& filename) {
+    ifstream file(filename);
+    file.imbue(std::locale(std::locale(), new std::codecvt_utf8<wchar_t>));
+    if (file.is_open()) {
+        string line;
+        while (getline(file, line)) {
+            // Parse order information from line
+            Order order;
+            istringstream iss(line);
+            iss >> order.id >> order.package_id >> order.quantity >> order.customer_name >> order.customer_phone;
+            getline(iss, order.delivery_address, ',');
+            string time_str{};
+            getline(iss, time_str);
+            tm tm{};
+            //istringstream time_stream(time_str);
+            sscanf(time_str.c_str(), "%d-%d-%d %d:%d:%d", &tm.tm_year, &tm.tm_mon, &tm.tm_mday, &tm.tm_hour, &tm.tm_min, &tm.tm_sec);
+            tm.tm_year -= 1900;
+            tm.tm_mon -= 1;
+            order.time = mktime(&tm);
+            order.delivered = (line.back() == '1');
+            orders.push_back(order);
+        }
+        file.close();
+    }
+}
+
+
+// Function to read location information from files
+void read_locations(const string& locations_filename, const string& distances_filename) {
+    ifstream locations_file(locations_filename);
+    if (locations_file.is_open()) {
+        string line;
+        while (getline(locations_file, line)) {
+            // Parse location name from line
+            const string& name = line;
+            locations[name] = Location{name};
+        }
+        locations_file.close();
+    }
+
+    ifstream distances_file(distances_filename);
+    if (distances_file.is_open()) {
+        string line;
+        while (getline(distances_file, line)) {
+            // Parse location names and distance from line
+            string name1, name2;
+            double distance;
+            // ...
+            locations[name1].distances[name2] = distance;
+            locations[name2].distances[name1] = distance;
+        }
+        distances_file.close();
+    }
+}
+
+// Function to write package information to file
+// Function to write package information to file
+void write_packages(const string& filename) {
+    ofstream file(filename);
+    if (file.is_open()) {
+        for (Package package : packages) {
+            // Write package information to file
+            file << package.id << " " << package.name << " " << package.description << " " << package.price << " " << package.available << endl;
+        }
+        file.close();
+    }
+}
+
+
+// Function to write order information to file
+void write_orders(const string& filename) {
+    ofstream file(filename);
+    if (file.is_open()) {
+        for (const Order& order : orders) {
+            // Write order information to file
+            file << order.id << " " << order.package_id << " " << order.quantity << " " << order.customer_name << " " << order.customer_phone << " " << order.delivery_address << " " << order.delivered << " " << order.time << endl;
+        }
+        file.close();
+    }
+}
+
+// Function to start work
+void start_work() {
+    read_packages("packages.txt");
+    read_orders("orders.txt");
+    read_locations("locations.txt", "distances.txt");
+}
+
+// Function to receive an order
+void receive_order() {
+    // Get order information from user
+    Order order;
+    cout << "Enter package id: ";
+    cin >> order.package_id;
+    cout << "Enter quantity: ";
+    cin >> order.quantity;
+    cout << "Enter customer name: ";
+    cin >> order.customer_name;
+    cout << "Enter customer phone: ";
+    cin >> order.customer_phone;
+    cout << "Enter delivery address: ";
+    cin >> order.delivery_address;
+
+    // Calculate order price
+    double price = 0;
+    for (Package package: packages) {
+        if (package.id == order.package_id) {
+            price = package.price * order.quantity;
+            break;
+        }
+    }
+
+    // Set order status to not delivered and add to orders
+    order.delivered = false;
+    orders.push_back(order);
+
+    cout << "Order received successfully. Price: " << price << endl;
+}
+
+/***/
+
+void display_orders() {
+    cout << "All orders:" << endl;
+    for (const Order& order: orders) {
+        cout << "Order id: " << order.id << endl;
+        cout << "Package id: " << order.package_id << endl;
+        cout << "Quantity: " << order.quantity << endl;
+        cout << "Customer name: " << order.customer_name << endl;
+        cout << "Customer phone: " << order.customer_phone << endl;
+        cout << "Delivery address: " << order.delivery_address << endl;
+        cout << "Delivered: " << (order.delivered ? "Yes" : "No") << endl;
+        cout << "Time: " << asctime(localtime(&order.time)) << endl;
+    }
+}
+
+// Function to query an order
+void query_order() {
+    // Get query information from user
+    string id, customer_name;
+    cout << "Enter order id: ";
+    getline(cin, id);
+    cout << "Enter customer name: ";
+    getline(cin, customer_name);
+
+    // Find and display matching orders
+    for (Order order: orders) {
+        if (order.id == id || order.customer_name == customer_name) {
+            // Display order information
+            display_orders();
+        }
+    }
+}
+
+// Function to display all orders
+// Function to display all orders
+
+// Function to deliver an order
+void deliver_order() {
+    queue<Order> undelivered_orders;
+    for (Order order: orders) {
+        if (!order.delivered) {
+            undelivered_orders.push(order);
+        }
+    }
+
+    while (!undelivered_orders.empty()) {
+        Order order = undelivered_orders.front();
+        undelivered_orders.pop();
+
+        // Generate delivery route, distance, and estimated time
+        string route;
+        double distance = 0;
+        time_t estimated_time = 0;
+        // ...
+
+        cout << "Delivering order " << order.id << endl;
+        cout << "Route: " << route << endl;
+        cout << "Distance: " << distance << endl;
+        cout << "Estimated time: " << asctime(localtime(&estimated_time)) << endl;
+
+        // Set order status to delivered
+        for (Order &o: orders) {
+            if (o.id == order.id) {
+                o.delivered = true;
+                break;
+            }
+        }
+    }
+}
+
+// Function to modify package information
+void modify_package() {
+    // Get package id or name from user
+    string id, name;
+    cout << "Enter package id and name: ";
+    cin >> id >> name;
+
+    // Find and modify matching package
+    for (Package &package: packages) {
+        if (package.id == id || package.name == name) {
+            // Get new package information from user
+            cout << "Enter new package name: ";
+            cin.ignore();
+            getline(cin, package.name);
+            cout << "Enter new package description: ";
+            getline(cin, package.description);
+            cout << "Enter new package price: ";
+            cin >> package.price;
+
+            cout << "Package modified successfully." << endl;
+            break;
+        }
+    }
+}
+
+// Function to delete package information
+void delete_package() {
+    // Get package id or name from user
+    string id, name;
+    cout << "Enter package id or name: ";
+    cin >> id >> name;
+
+    // Find and delete matching package
+    for (Package &package: packages) {
+        if (package.id == id || package.name == name) {
+            // Set package status to unavailable
+            package.available = false;
+
+            cout << "Package deleted successfully." << endl;
+            break;
+        }
+    }
+}
+
+// Function to calculate daily order statistics
+void daily_statistics() {
+    int received = 0, delivered = 0;
+    double total = 0;
+    for (const Order& order: orders) {
+        time_t now = time(nullptr);
+        tm *ltm = localtime(&now);
+        tm *ord = localtime(&order.time);
+        if (ltm->tm_year == ord->tm_year && ltm->tm_yday == ord->tm_yday) {
+            received++;
+            if (order.delivered) {
+                delivered++;
+            }
+            for (Package package: packages) {
+                if (package.id == order.package_id) {
+                    total += package.price * order.quantity;
+                    break;
+                }
+            }
+        }
+    }
+
+    cout << "Daily statistics:" << endl;
+    cout << "Received: " << received << endl;
+    cout << "Delivered: " << delivered << endl;
+    cout << "Total: " << total << endl;
+
+}
+
+// Function to calculate monthly package statistics
+void monthly_statistics() {
+    map<string, int> quantities;
+    map<string, double> totals;
+    for (Order order: orders) {
+        time_t now = time(nullptr);
+        tm *ltm = localtime(&now);
+        tm *ord = localtime(&order.time);
+        if (ltm->tm_year == ord->tm_year && ltm->tm_mon == ord->tm_mon)
+        {
+            quantities[order.package_id] += order.quantity;
+            for (Package package: packages) {
+                if (package.id == order.package_id) {
+                    totals[order.package_id] += package.price * order.quantity;
+                    break;
+                }
+            }
+        }
+    }
+
+    cout << "Monthly statistics:" << endl;
+    for (auto it: quantities) {
+        string id = it.first;
+        int quantity = it.second;
+        double total = totals[id];
+        cout << "Package id: " << id << endl;
+        cout << "Quantity: " << quantity << endl;
+        cout << "Total: " << total << endl;
+    }
+}
+
+// Function to end work
+void end_work() {
+    write_packages("packages.txt");
+    write_orders("orders.txt");
+}
+
+int main() {
+    start_work();
+
+    bool running = true;
+    while (running) {
+        // Display menu and get user choice
+        int choice;
+        cout << "1. Receive order" << endl;
+        cout << "2. Query order" << endl;
+        cout << "3. Display orders" << endl;
+        cout << "4. Deliver order" << endl;
+        cout << "5. Modify package" << endl;
+        cout << "6. Delete package" << endl;
+        cout << "7. Daily statistics" << endl;
+        cout << "8. Monthly statistics" << endl;
+        cout << "9. Quit" << endl;
+        cout << "Enter your choice: ";
+        cin >> choice;
+
+        // Perform action based on user choice
+        switch (choice) {
+            case 1:
+                receive_order();
+                break;
+            case 2:
+                query_order();
+                break;
+            case 3:
+                display_orders();
+                break;
+            case 4:
+                deliver_order();
+                break;
+            case 5:
+                modify_package();
+                break;
+            case 6:
+                delete_package();
+                break;
+            case 7:
+                daily_statistics();
+                break;
+            case 8:
+                monthly_statistics();
+                break;
+            case 9:
+                running = false;
+                break;
+            default:
+                break;
+        }
+    }
+
+    end_work();
+
+    return 0;
+}
